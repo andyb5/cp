@@ -4,17 +4,54 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
+import { APP_VERSION, SUBSCRIPTION_PRICE, SUBSCRIPTION_PERIOD, TRIAL_DAYS } from '@/lib/constants';
 
 export default function SettingsPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const [showSubscription, setShowSubscription] = useState(false);
+  const [showExportConfirm, setShowExportConfirm] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  // Escape to close modals
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowSubscription(false);
+        setShowExportConfirm(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/counters');
+      if (res.ok) {
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `tallyup-export-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      // Export failed silently
+    } finally {
+      setExporting(false);
+      setShowExportConfirm(false);
+    }
+  };
 
   if (loading || !user) {
     return (
@@ -33,77 +70,101 @@ export default function SettingsPage() {
     : 0;
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh fullscreen-container">
       <Header />
 
       <main className="max-w-lg mx-auto px-4 sm:px-6 py-6 safe-area">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] mb-6">
-          Settings
-        </h1>
+        <div className="mb-6">
+          <h1 className="text-[24px] sm:text-[28px] font-bold text-[var(--foreground)] leading-tight">
+            Settings
+          </h1>
+          <p className="text-[13px] text-[var(--muted)] mt-0.5">
+            Manage your account and preferences
+          </p>
+        </div>
 
-        <div className="space-y-4 animate-slide-up">
-          {/* Account Info */}
-          <div className="glass-card p-5">
-            <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-3">Account</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-[var(--divider)]">
-                <span className="text-[var(--muted)]">Name</span>
-                <span className="font-medium text-[var(--foreground)]">{user.name}</span>
+        <div className="space-y-5 animate-fade-in">
+          {/* Account Section */}
+          <div>
+            <h2 className="text-[12px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Account</h2>
+            <div className="grouped-list">
+              <div className="grouped-list-item">
+                <span className="text-[15px] text-[var(--foreground)]">Name</span>
+                <span className="text-[15px] text-[var(--muted)]">{user.name}</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-[var(--divider)]">
-                <span className="text-[var(--muted)]">Email</span>
-                <span className="font-medium text-[var(--foreground)]">{user.email}</span>
+              <div className="grouped-list-item">
+                <span className="text-[15px] text-[var(--foreground)]">Email</span>
+                <span className="text-[15px] text-[var(--muted)]">{user.email}</span>
               </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-[var(--muted)]">Member since</span>
-                <span className="font-medium text-[var(--foreground)]">
+              <div className="grouped-list-item">
+                <span className="text-[15px] text-[var(--foreground)]">Member since</span>
+                <span className="text-[15px] text-[var(--muted)]">
                   {new Date(user.createdAt!).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Subscription */}
-          <div className="glass-card p-5">
-            <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-3">Subscription</h2>
-
-            <div className="flex items-center justify-between py-2 mb-3">
-              <span className="text-[var(--muted)]">Status</span>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                user.subscriptionStatus === 'active'
-                  ? 'bg-[var(--success)]/15 text-[var(--success)]'
-                  : isTrialActive
-                  ? 'bg-[var(--warning)]/15 text-[var(--warning)]'
-                  : 'bg-[var(--danger)]/15 text-[var(--danger)]'
-              }`}>
-                {user.subscriptionStatus === 'active'
-                  ? 'Active'
-                  : isTrialActive
-                  ? `Trial (${trialDaysLeft} days left)`
-                  : 'Expired'}
-              </span>
+          {/* Subscription Section */}
+          <div>
+            <h2 className="text-[12px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Subscription</h2>
+            <div className="grouped-list">
+              <div className="grouped-list-item">
+                <span className="text-[15px] text-[var(--foreground)]">Status</span>
+                <span className={`text-[13px] font-medium px-2.5 py-1 rounded-full ${
+                  user.subscriptionStatus === 'active'
+                    ? 'bg-[var(--success-light)] text-[var(--success)]'
+                    : isTrialActive
+                    ? 'bg-[var(--warning-light)] text-[var(--warning)]'
+                    : 'bg-[var(--danger-light)] text-[var(--danger)]'
+                }`}>
+                  {user.subscriptionStatus === 'active'
+                    ? 'Active'
+                    : isTrialActive
+                    ? `Trial \u2022 ${trialDaysLeft} days left`
+                    : 'Expired'}
+                </span>
+              </div>
+              {user.subscriptionStatus !== 'active' && (
+                <button
+                  onClick={() => setShowSubscription(true)}
+                  className="grouped-list-item hover:bg-[var(--divider)] transition-colors cursor-pointer"
+                >
+                  <span className="text-[15px] text-[var(--accent)] font-medium">Upgrade to Pro</span>
+                  <span className="text-[13px] text-[var(--muted)]">{SUBSCRIPTION_PRICE}/{SUBSCRIPTION_PERIOD}</span>
+                </button>
+              )}
             </div>
-
-            {user.subscriptionStatus !== 'active' && (
-              <button
-                onClick={() => setShowSubscription(true)}
-                className="btn-primary w-full"
-              >
-                Subscribe — $5.55/year
-              </button>
-            )}
           </div>
 
-          {/* App Info */}
-          <div className="glass-card p-5">
-            <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-3">App</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-[var(--divider)]">
-                <span className="text-[var(--muted)]">Version</span>
-                <span className="font-medium text-[var(--foreground)]">1.0.0</span>
+          {/* Data Section */}
+          <div>
+            <h2 className="text-[12px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Data</h2>
+            <div className="grouped-list">
+              <button
+                onClick={() => setShowExportConfirm(true)}
+                className="grouped-list-item hover:bg-[var(--divider)] transition-colors cursor-pointer w-full"
+              >
+                <span className="text-[15px] text-[var(--foreground)]">Export Data</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* App Section */}
+          <div>
+            <h2 className="text-[12px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">App</h2>
+            <div className="grouped-list">
+              <div className="grouped-list-item">
+                <span className="text-[15px] text-[var(--foreground)]">Version</span>
+                <span className="text-[15px] text-[var(--muted)]">{APP_VERSION}</span>
               </div>
-              <div className="py-2">
-                <p className="text-sm text-[var(--muted)]">
+              <div className="px-4 py-3">
+                <p className="text-[13px] text-[var(--muted)] leading-relaxed">
                   Add to Home Screen for the best experience. TallyUp works as a standalone app on iOS, iPadOS, and macOS.
                 </p>
               </div>
@@ -111,53 +172,91 @@ export default function SettingsPage() {
           </div>
 
           {/* Sign Out */}
-          <button
-            onClick={async () => { await logout(); router.push('/'); }}
-            className="btn-secondary w-full text-[var(--danger)]"
-          >
-            Sign Out
-          </button>
+          <div>
+            <div className="grouped-list">
+              <button
+                onClick={async () => { await logout(); router.push('/'); }}
+                className="grouped-list-item hover:bg-[var(--danger-light)] transition-colors cursor-pointer w-full justify-center"
+              >
+                <span className="text-[15px] text-[var(--danger)] font-medium">Sign Out</span>
+              </button>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Export Confirm */}
+      {showExportConfirm && (
+        <div
+          className="modal-backdrop flex items-center justify-center"
+          onClick={() => setShowExportConfirm(false)}
+        >
+          <div
+            className="glass-card-elevated w-full max-w-[320px] mx-4 p-6 rounded-2xl animate-bounce-in text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-[40px] mb-3">📦</div>
+            <h3 className="text-[18px] font-bold text-[var(--foreground)] mb-2">Export Data</h3>
+            <p className="text-[14px] text-[var(--muted)] mb-5">
+              Download all your counter data as a JSON file.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                className="btn-primary flex-1 !py-3"
+              >
+                {exporting ? 'Exporting...' : 'Download'}
+              </button>
+              <button
+                onClick={() => setShowExportConfirm(false)}
+                className="btn-secondary flex-1 !py-3"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Subscription Modal */}
       {showSubscription && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          className="modal-backdrop flex items-end sm:items-center justify-center"
           onClick={() => setShowSubscription(false)}
         >
           <div
-            className="glass-card w-full sm:max-w-md sm:mx-4 p-8 sm:rounded-2xl rounded-t-2xl animate-slide-up safe-area"
+            className="glass-card-elevated w-full sm:max-w-[400px] sm:mx-4 p-8 sm:rounded-2xl rounded-t-2xl animate-slide-in-bottom sm:animate-bounce-in safe-area"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center">
-              <div className="text-5xl mb-4">🌟</div>
-              <h2 className="text-2xl font-bold text-[var(--foreground)] mb-2">TallyUp Pro</h2>
-              <p className="text-[var(--muted)] mb-6">Unlimited counters, unlimited potential.</p>
+              <div className="text-[56px] mb-3 animate-float">✨</div>
+              <h2 className="text-[24px] font-bold text-[var(--foreground)] mb-1">TallyUp Pro</h2>
+              <p className="text-[15px] text-[var(--muted)] mb-6">Unlimited counters, unlimited potential.</p>
 
               <div className="glass-card p-6 mb-6" style={{ border: '2px solid var(--accent)' }}>
-                <p className="text-4xl font-bold text-[var(--accent)]">$5.55</p>
-                <p className="text-sm text-[var(--muted)]">per year</p>
-                <p className="text-xs text-[var(--muted)] mt-2">That&apos;s less than $0.50/month!</p>
+                <p className="text-[40px] font-bold text-[var(--accent)] leading-none">{SUBSCRIPTION_PRICE}</p>
+                <p className="text-[14px] text-[var(--muted)] mt-1">per {SUBSCRIPTION_PERIOD}</p>
+                <p className="text-[12px] text-[var(--muted-2)] mt-1.5">That&apos;s less than $0.50/month!</p>
               </div>
 
-              <ul className="text-left space-y-3 mb-6">
+              <div className="text-left space-y-3 mb-6">
                 {[
-                  'Unlimited counters',
-                  'Full reporting history',
-                  'Cross-device sync',
-                  'Goal celebrations',
-                  'Priority support',
+                  { icon: '∞', text: 'Unlimited counters' },
+                  { icon: '📊', text: 'Full reporting history' },
+                  { icon: '🔄', text: 'Cross-device sync' },
+                  { icon: '🎉', text: 'Goal celebrations' },
+                  { icon: '⚡', text: 'Priority support' },
                 ].map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm text-[var(--foreground)]">
-                    <span className="text-[var(--success)] flex-shrink-0">&#10003;</span>
-                    {feature}
-                  </li>
+                  <div key={feature.text} className="flex items-center gap-3 text-[14px] text-[var(--foreground)]">
+                    <span className="text-[16px] w-6 text-center flex-shrink-0">{feature.icon}</span>
+                    {feature.text}
+                  </div>
                 ))}
-              </ul>
+              </div>
 
               <button
-                className="btn-primary w-full text-lg py-4 mb-3"
+                className="btn-primary w-full text-[17px] py-3.5 mb-3"
                 onClick={() => {
                   alert('Payment integration would connect to Stripe or Apple Pay here. For now, your trial continues!');
                   setShowSubscription(false);
@@ -167,7 +266,7 @@ export default function SettingsPage() {
               </button>
               <button
                 onClick={() => setShowSubscription(false)}
-                className="text-sm text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                className="text-[14px] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors py-2"
               >
                 Maybe later
               </button>

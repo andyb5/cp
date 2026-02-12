@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { COLORS, PERIOD_TYPES, WEEKDAYS, COUNTER_TEMPLATES } from '@/lib/constants';
 
 interface CounterFormData {
   id?: string;
@@ -20,30 +21,6 @@ interface CounterModalProps {
   initialData?: CounterFormData | null;
 }
 
-const COLORS = [
-  '#007AFF', '#5856D6', '#AF52DE', '#FF2D55', '#FF3B30',
-  '#FF9500', '#FFCC00', '#34C759', '#00C7BE', '#30B0C7',
-  '#5AC8FA', '#64D2FF', '#A2845E', '#8E8E93',
-];
-
-const PERIOD_TYPES = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'alltime', label: 'All Time' },
-];
-
-const WEEKDAYS = [
-  { value: 'monday', label: 'Monday' },
-  { value: 'tuesday', label: 'Tuesday' },
-  { value: 'wednesday', label: 'Wednesday' },
-  { value: 'thursday', label: 'Thursday' },
-  { value: 'friday', label: 'Friday' },
-  { value: 'saturday', label: 'Saturday' },
-  { value: 'sunday', label: 'Sunday' },
-];
-
 export default function CounterModal({ isOpen, onClose, onSave, onDelete, initialData }: CounterModalProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#007AFF');
@@ -54,6 +31,8 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -63,6 +42,7 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
       setIncrement(initialData.increment.toString());
       setPeriodType(initialData.periodType);
       setPeriodStart(initialData.periodStart);
+      setShowTemplates(false);
     } else {
       setName('');
       setColor('#007AFF');
@@ -70,12 +50,30 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
       setIncrement('1');
       setPeriodType('daily');
       setPeriodStart('monday');
+      setShowTemplates(true);
     }
     setShowDeleteConfirm(false);
+    setError('');
   }, [initialData, isOpen]);
 
+  // Escape to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  const validate = (): boolean => {
+    if (!name.trim()) { setError('Please enter a counter name'); return false; }
+    if (goal && (parseInt(goal) <= 0 || isNaN(parseInt(goal)))) { setError('Goal must be a positive number'); return false; }
+    if (parseInt(increment) <= 0 || isNaN(parseInt(increment))) { setError('Step must be a positive number'); return false; }
+    setError('');
+    return true;
+  };
+
   const handleSave = async () => {
-    if (!name.trim()) return;
+    if (!validate()) return;
     setSaving(true);
     try {
       await onSave({
@@ -88,8 +86,8 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
         periodStart,
       });
       onClose();
-    } catch (err) {
-      console.error('Save error:', err);
+    } catch {
+      setError('Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -101,60 +99,97 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
     try {
       await onDelete();
       onClose();
-    } catch (err) {
-      console.error('Delete error:', err);
+    } catch {
+      setError('Failed to delete.');
     } finally {
       setDeleting(false);
     }
   };
 
+  const applyTemplate = (template: typeof COUNTER_TEMPLATES[number]) => {
+    setName(template.name);
+    setColor(template.color);
+    setGoal(template.goal.toString());
+    setIncrement(template.increment.toString());
+    setPeriodType(template.periodType);
+    setShowTemplates(false);
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="modal-backdrop flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
-        className="glass-card w-full sm:max-w-md sm:mx-4 p-6 sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto animate-slide-up safe-area"
+        className="glass-card-elevated w-full sm:max-w-[420px] sm:mx-4 p-6 sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto no-scrollbar animate-slide-in-bottom sm:animate-bounce-in safe-area"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[var(--foreground)]">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-[20px] font-bold text-[var(--foreground)]">
             {initialData ? 'Edit Counter' : 'New Counter'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[var(--divider)] transition-colors"
+            className="w-8 h-8 rounded-full bg-[var(--input-bg)] flex items-center justify-center hover:bg-[var(--divider)] transition-colors"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="bg-[var(--danger-light)] text-[var(--danger)] px-4 py-2.5 rounded-xl text-[14px] font-medium mb-4 animate-slide-down">
+            {error}
+          </div>
+        )}
+
+        {/* Templates (only for new counters) */}
+        {!initialData && showTemplates && (
+          <div className="mb-5">
+            <p className="text-[13px] font-medium text-[var(--muted)] mb-2">Quick start from template</p>
+            <div className="flex flex-wrap gap-2">
+              {COUNTER_TEMPLATES.map((t) => (
+                <button
+                  key={t.name}
+                  onClick={() => applyTemplate(t)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium bg-[var(--input-bg)] text-[var(--foreground)] hover:bg-[var(--divider)] transition-colors"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
+                  {t.name}
+                </button>
+              ))}
+            </div>
+            <div className="border-b border-[var(--divider)] my-5" />
+          </div>
+        )}
+
         <div className="space-y-5">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-2">Counter Name</label>
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Counter Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Push-ups, Glasses of Water"
               autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
             />
           </div>
 
           {/* Color */}
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-2">Color</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-2">Color</label>
+            <div className="flex flex-wrap gap-2.5">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   onClick={() => setColor(c)}
-                  className={`w-9 h-9 rounded-full transition-all ${
-                    color === c ? 'ring-2 ring-offset-2 ring-[var(--accent)] scale-110' : 'hover:scale-110'
-                  }`}
+                  className={`color-dot ${color === c ? 'selected' : ''}`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
               ))}
             </div>
@@ -162,18 +197,13 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
 
           {/* Period Type */}
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-2">Tracking Period</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-2">Tracking Period</label>
+            <div className="segment-control flex-wrap">
               {PERIOD_TYPES.map((p) => (
                 <button
                   key={p.value}
                   onClick={() => setPeriodType(p.value)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    periodType === p.value
-                      ? 'text-white'
-                      : 'bg-[var(--input-bg)] text-[var(--foreground)] hover:bg-[var(--divider)]'
-                  }`}
-                  style={periodType === p.value ? { backgroundColor: color } : {}}
+                  className={periodType === p.value ? 'active' : ''}
                 >
                   {p.label}
                 </button>
@@ -181,29 +211,21 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
             </div>
           </div>
 
-          {/* Period Start (for weekly) */}
+          {/* Period Start (weekly) */}
           {periodType === 'weekly' && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--muted)] mb-2">Week Starts On</label>
-              <select
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-              >
-                {WEEKDAYS.map((d) => (
-                  <option key={d.value} value={d.value}>{d.label}</option>
-                ))}
+            <div className="animate-slide-down">
+              <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Week Starts On</label>
+              <select value={periodStart} onChange={(e) => setPeriodStart(e.target.value)}>
+                {WEEKDAYS.map((d) => (<option key={d.value} value={d.value}>{d.label}</option>))}
               </select>
             </div>
           )}
 
-          {/* Period Start (for monthly) */}
+          {/* Period Start (monthly) */}
           {periodType === 'monthly' && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--muted)] mb-2">Month Starts On Day</label>
-              <select
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-              >
+            <div className="animate-slide-down">
+              <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Month Starts On Day</label>
+              <select value={periodStart} onChange={(e) => setPeriodStart(e.target.value)}>
                 {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                   <option key={d} value={d.toString()}>{d}</option>
                 ))}
@@ -211,39 +233,39 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
             </div>
           )}
 
-          {/* Goal */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-2">
-              Goal <span className="text-xs text-[var(--muted)]">(optional)</span>
-            </label>
-            <input
-              type="number"
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="e.g., 100"
-              min="1"
-            />
-          </div>
-
-          {/* Increment */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-2">Step Amount</label>
-            <input
-              type="number"
-              value={increment}
-              onChange={(e) => setIncrement(e.target.value)}
-              placeholder="1"
-              min="1"
-            />
+          {/* Goal & Increment side by side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">
+                Goal <span className="text-[var(--muted-2)]">(optional)</span>
+              </label>
+              <input
+                type="number"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="e.g., 100"
+                min="1"
+              />
+            </div>
+            <div>
+              <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Step Amount</label>
+              <input
+                type="number"
+                value={increment}
+                onChange={(e) => setIncrement(e.target.value)}
+                placeholder="1"
+                min="1"
+              />
+            </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="mt-8 space-y-3">
+        <div className="mt-7 space-y-2.5">
           <button
             onClick={handleSave}
             disabled={!name.trim() || saving}
-            className="btn-primary w-full"
+            className="btn-primary w-full text-[17px] py-3.5"
             style={{ backgroundColor: color }}
           >
             {saving ? 'Saving...' : initialData ? 'Save Changes' : 'Create Counter'}
@@ -253,17 +275,17 @@ export default function CounterModal({ isOpen, onClose, onSave, onDelete, initia
             <>
               {showDeleteConfirm ? (
                 <div className="flex gap-2">
-                  <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1">
-                    {deleting ? 'Deleting...' : 'Confirm Delete'}
+                  <button onClick={handleDelete} disabled={deleting} className="btn-danger flex-1 !py-3">
+                    {deleting ? 'Deleting...' : 'Yes, Delete'}
                   </button>
-                  <button onClick={() => setShowDeleteConfirm(false)} className="btn-secondary flex-1">
+                  <button onClick={() => setShowDeleteConfirm(false)} className="btn-secondary flex-1 !py-3">
                     Cancel
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full py-3 text-[var(--danger)] text-sm font-medium hover:bg-[var(--danger)]/10 rounded-xl transition-colors"
+                  className="w-full py-2.5 text-[var(--danger)] text-[15px] font-medium hover:bg-[var(--danger-light)] rounded-xl transition-colors"
                 >
                   Delete Counter
                 </button>

@@ -8,6 +8,8 @@ import CounterCard from '@/components/CounterCard';
 import CounterModal from '@/components/CounterModal';
 import FullscreenButton from '@/components/FullscreenButton';
 import { CounterData } from '@/lib/types';
+import { POLL_INTERVAL_MS } from '@/lib/constants';
+import { requestWakeLock } from '@/lib/haptics';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
@@ -40,11 +42,30 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       fetchCounters();
-      // Refresh every 30 seconds for cross-device sync
-      const interval = setInterval(fetchCounters, 30000);
+      const interval = setInterval(fetchCounters, POLL_INTERVAL_MS);
       return () => clearInterval(interval);
     }
   }, [user, fetchCounters]);
+
+  // Wake lock to keep screen on
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+    requestWakeLock().then(wl => { wakeLock = wl; });
+    return () => { wakeLock?.release(); };
+  }, []);
+
+  // Keyboard shortcut: N to create new counter
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'n' && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setEditingCounter(null);
+        setShowModal(true);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   const handleSave = async (data: { id?: string; name: string; color: string; goal: number | null; increment: number; periodType: string; periodStart: string }) => {
     if (data.id) {
@@ -87,13 +108,13 @@ export default function DashboardPage() {
       <Header />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 safe-area">
-        {/* Header area */}
+        {/* Top bar */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">
+            <h1 className="text-[24px] sm:text-[28px] font-bold text-[var(--foreground)] leading-tight">
               My Counters
             </h1>
-            <p className="text-sm text-[var(--muted)] mt-1">
+            <p className="text-[13px] text-[var(--muted)] mt-0.5">
               {counters.length === 0 ? 'Create your first counter to get started' : `${counters.length} counter${counters.length !== 1 ? 's' : ''}`}
             </p>
           </div>
@@ -101,9 +122,9 @@ export default function DashboardPage() {
             <FullscreenButton />
             <button
               onClick={() => { setEditingCounter(null); setShowModal(true); }}
-              className="btn-primary !py-2.5 !px-5 !text-sm"
+              className="btn-primary !py-2 !px-4 !text-[14px] !rounded-xl"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
               New
@@ -115,29 +136,39 @@ export default function DashboardPage() {
         {loadingCounters ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="glass-card p-6 h-52 animate-pulse">
-                <div className="h-4 bg-[var(--divider)] rounded w-1/2 mb-4" />
-                <div className="h-12 bg-[var(--divider)] rounded w-1/3 mx-auto mb-4" />
-                <div className="h-2 bg-[var(--divider)] rounded w-full" />
+              <div key={i} className="glass-card p-6 h-[220px]">
+                <div className="skeleton h-4 w-1/2 mb-4" />
+                <div className="skeleton h-3 w-1/4 mb-8" />
+                <div className="skeleton h-14 w-1/3 mx-auto mb-6" />
+                <div className="skeleton h-1.5 w-full" />
               </div>
             ))}
           </div>
         ) : counters.length === 0 ? (
           <div className="text-center py-20 animate-fade-in">
-            <div className="text-6xl mb-4">🎯</div>
-            <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">No counters yet</h2>
-            <p className="text-[var(--muted)] mb-6">Create your first counter and start tracking!</p>
+            <div className="text-[64px] mb-4 animate-float">🎯</div>
+            <h2 className="text-[22px] font-bold text-[var(--foreground)] mb-2">No counters yet</h2>
+            <p className="text-[15px] text-[var(--muted)] mb-8 max-w-xs mx-auto">
+              Create your first counter and start tracking what matters to you.
+            </p>
             <button
               onClick={() => { setEditingCounter(null); setShowModal(true); }}
-              className="btn-primary"
+              className="btn-primary text-[17px] py-3.5 px-8"
             >
               Create Your First Counter
             </button>
+            <p className="text-[12px] text-[var(--muted-2)] mt-4">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-[var(--input-bg)] text-[var(--muted)] font-mono text-[11px]">N</kbd> to create quickly
+            </p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {counters.map((counter, idx) => (
-              <div key={counter.id} className="animate-slide-up" style={{ animationDelay: `${idx * 60}ms` }}>
+              <div
+                key={counter.id}
+                className="animate-slide-up"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
                 <CounterCard
                   counter={counter}
                   onUpdate={fetchCounters}

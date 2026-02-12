@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { SUBSCRIPTION_PRICE, SUBSCRIPTION_PERIOD, TRIAL_DAYS } from '@/lib/constants';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -30,23 +31,29 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-sm animate-slide-up">
+      {/* Floating background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute top-1/3 -right-32 w-72 h-72 rounded-full bg-[var(--accent)] opacity-[0.04] blur-3xl" />
+        <div className="absolute bottom-1/3 -left-32 w-64 h-64 rounded-full bg-[var(--warning)] opacity-[0.04] blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
-          <button onClick={() => router.push('/')} className="text-3xl font-bold tracking-tight text-[var(--foreground)]">
+          <button onClick={() => router.push('/')} className="text-[32px] font-bold tracking-tight text-[var(--foreground)] hover:opacity-80 transition-opacity">
             Tally<span className="text-[var(--accent)]">Up</span>
           </button>
-          <p className="text-[var(--muted)] mt-2">Create your account</p>
+          <p className="text-[15px] text-[var(--muted)] mt-2">Create your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="glass-card-elevated p-6 space-y-4">
           {error && (
-            <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/20 text-[var(--danger)] px-4 py-3 rounded-xl text-sm">
+            <div className="bg-[var(--danger-light)] text-[var(--danger)] px-4 py-2.5 rounded-xl text-[14px] font-medium animate-slide-down">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-1.5">Name</label>
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Name</label>
             <input
               type="text"
               value={name}
@@ -58,7 +65,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-1.5">Email</label>
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Email</label>
             <input
               type="email"
               value={email}
@@ -69,7 +76,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[var(--muted)] mb-1.5">Password</label>
+            <label className="block text-[13px] font-medium text-[var(--muted)] mb-1.5">Password</label>
             <input
               type="password"
               value={password}
@@ -80,18 +87,18 @@ export default function RegisterPage() {
             />
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
+          <button type="submit" disabled={loading} className="btn-primary w-full !py-3 text-[16px] mt-2">
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
 
-          <p className="text-xs text-center text-[var(--muted)] mt-3">
-            14-day free trial &middot; Then $5.55/year
+          <p className="text-[12px] text-center text-[var(--muted-2)] pt-1">
+            {TRIAL_DAYS}-day free trial &middot; Then {SUBSCRIPTION_PRICE}/{SUBSCRIPTION_PERIOD}
           </p>
         </form>
 
-        <p className="text-center text-sm text-[var(--muted)] mt-6">
+        <p className="text-center text-[14px] text-[var(--muted)] mt-6">
           Already have an account?{' '}
-          <button onClick={() => router.push('/login')} className="text-[var(--accent)] font-medium">
+          <button onClick={() => router.push('/login')} className="text-[var(--accent)] font-semibold hover:underline">
             Sign In
           </button>
         </p>
